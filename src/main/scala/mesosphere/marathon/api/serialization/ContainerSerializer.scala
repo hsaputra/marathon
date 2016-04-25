@@ -71,6 +71,7 @@ object VolumeSerializer {
 
   /** Only DockerVolumes can be serialized into a Mesos Protobuf */
   def toMesos(volume: DockerVolume): mesos.Protos.Volume =
+    // similar to src/main/scala/mesosphere/marathon/core/externalvolume/impl/providers/DVDIProvider.scala
     mesos.Protos.Volume.newBuilder
       .setContainerPath(volume.containerPath)
       .setHostPath(volume.hostPath)
