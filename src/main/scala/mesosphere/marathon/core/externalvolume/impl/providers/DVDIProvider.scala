@@ -20,11 +20,14 @@ import scala.collection.immutable.Set
   *   - mesos containerizer only supports volumes mounted in RW mode
   */
 private[impl] case object DVDIProvider extends ExternalVolumeProvider {
+  type MesosDockerVolume = MesosVolume.Source.DockerVolume
+  type MesosDockerVolumeBuilder = MesosVolume.Source.DockerVolume.Builder
+
   override val name: String = "dvdi"
 
   override def validations: ExternalVolumeValidations = DVDIProviderValidations
 
-  override def build(builder: ContainerInfo.Builder, ev: ExternalVolume): Unit = {
+  object Builders {
     // similar to code in src/main/scala/mesosphere/marathon/api/serialization/ContainerSerializer.scala
     def toDockerizedMesosVolume(volume: ExternalVolume): MesosVolume =
       MesosVolume.newBuilder
@@ -33,7 +36,7 @@ private[impl] case object DVDIProvider extends ExternalVolumeProvider {
         .setMode(volume.mode)
         .build
 
-    def dockerVolumeParameters(volume: ExternalVolume) = {
+    def dockerVolumeParameters(volume: ExternalVolume): Seq[Parameter] = {
       import OptionLabelPatterns._
       val prefix: String = name + OptionNamespaceSeparator
       // don't let the user override these
@@ -52,7 +55,17 @@ private[impl] case object DVDIProvider extends ExternalVolumeProvider {
           .setKey(k.substring(prefix.length))
           .setValue(v.trim())
           .build
-      }.asJava
+      }.toSeq
+    }
+
+    def applyOptions(dv: MesosDockerVolumeBuilder, opts: Seq[Parameter]): MesosDockerVolume = {
+      if (opts.isEmpty) {
+        dv.clearDriverOptions
+      }
+      else {
+        dv.setDriverOptions(Parameters.newBuilder.addAllParameter(opts.asJava))
+      }
+      dv.build
     }
 
     def toUnifiedMesosVolume(volume: ExternalVolume): MesosVolume = {
@@ -62,25 +75,27 @@ private[impl] case object DVDIProvider extends ExternalVolumeProvider {
         .setMode(volume.mode)
         .setSource(MesosVolume.Source.newBuilder
           .setType(MesosVolume.Source.Type.DOCKER_VOLUME)
-          .setDockerVolume(MesosVolume.Source.DockerVolume.newBuilder
-            .setDriver(driverName)
-            .setName(volume.external.name)
-            .setDriverOptions(Parameters.newBuilder.addAllParameter(dockerVolumeParameters(volume)).build)
-            .build)
-          .build)
-        .build
+          .setDockerVolume(applyOptions(
+            MesosVolume.Source.DockerVolume.newBuilder
+              .setDriver(driverName)
+              .setName(volume.external.name),
+            dockerVolumeParameters(volume))
+          )
+        ).build
     }
+  } // Builders
 
+  override def build(builder: ContainerInfo.Builder, ev: ExternalVolume): Unit = {
     // special behavior for docker vs. mesos containers
     // - docker containerizer: serialize volumes into mesos proto
     // - docker containerizer: specify "volumeDriver" for the container
     if (builder.getType == ContainerInfo.Type.DOCKER && builder.hasDocker) {
       val driverName = ev.external.options(driverOption)
       builder.setDocker(builder.getDocker.toBuilder.setVolumeDriver(driverName).build)
-      builder.addVolumes(toDockerizedMesosVolume(ev))
+      builder.addVolumes(Builders.toDockerizedMesosVolume(ev))
     }
     else if (builder.getType == ContainerInfo.Type.MESOS) {
-      builder.addVolumes(toUnifiedMesosVolume(ev))
+      builder.addVolumes(Builders.toUnifiedMesosVolume(ev))
     }
   }
 
