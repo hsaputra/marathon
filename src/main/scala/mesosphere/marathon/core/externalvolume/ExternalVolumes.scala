@@ -3,7 +3,7 @@ package mesosphere.marathon.core.externalvolume
 import com.wix.accord._
 import mesosphere.marathon.core.externalvolume.impl._
 import mesosphere.marathon.state._
-import org.apache.mesos.Protos.{ ContainerInfo }
+import org.apache.mesos.Protos.ContainerInfo
 
 /**
   * API facade for callers interested in storage volumes

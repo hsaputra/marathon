@@ -20,15 +20,14 @@ import scala.collection.immutable.Set
   *   - mesos containerizer only supports volumes mounted in RW mode
   */
 private[impl] case object DVDIProvider extends ExternalVolumeProvider {
-  type MesosDockerVolume = MesosVolume.Source.DockerVolume
-  type MesosDockerVolumeBuilder = MesosVolume.Source.DockerVolume.Builder
-
   override val name: String = "dvdi"
 
   override def validations: ExternalVolumeValidations = DVDIProviderValidations
 
   object Builders {
-    // similar to code in src/main/scala/mesosphere/marathon/api/serialization/ContainerSerializer.scala
+    /**
+     * see [[mesosphere.marathon.api.serialization.ContainerSerializer]].
+     */
     def toDockerizedMesosVolume(volume: ExternalVolume): MesosVolume =
       MesosVolume.newBuilder
         .setContainerPath(volume.containerPath)
@@ -50,7 +49,7 @@ private[impl] case object DVDIProvider extends ExternalVolumeProvider {
       // and trimming the values
       opts.filterKeys{ k =>
         k.startsWith(prefix) && !ignore.contains(k.toLowerCase)
-      }.map{
+      }.map {
         case (k, v) => Parameter.newBuilder
           .setKey(k.substring(prefix.length))
           .setValue(v.trim())
@@ -58,29 +57,27 @@ private[impl] case object DVDIProvider extends ExternalVolumeProvider {
       }.toSeq
     }
 
-    def applyOptions(dv: MesosDockerVolumeBuilder, opts: Seq[Parameter]): MesosDockerVolume = {
+    def applyOptions(dv: MesosVolume.Source.DockerVolume.Builder, opts: Seq[Parameter]): Unit = {
       if (opts.isEmpty) {
         dv.clearDriverOptions
       }
       else {
         dv.setDriverOptions(Parameters.newBuilder.addAllParameter(opts.asJava))
       }
-      dv.build
     }
 
     def toUnifiedMesosVolume(volume: ExternalVolume): MesosVolume = {
       val driverName = volume.external.options(driverOption)
+      val volBuilder = MesosVolume.Source.DockerVolume.newBuilder
+        .setDriver(driverName)
+        .setName(volume.external.name)
+      applyOptions(volBuilder, dockerVolumeParameters(volume))
       MesosVolume.newBuilder
         .setContainerPath(volume.containerPath)
         .setMode(volume.mode)
         .setSource(MesosVolume.Source.newBuilder
           .setType(MesosVolume.Source.Type.DOCKER_VOLUME)
-          .setDockerVolume(applyOptions(
-            MesosVolume.Source.DockerVolume.newBuilder
-              .setDriver(driverName)
-              .setName(volume.external.name),
-            dockerVolumeParameters(volume))
-          )
+          .setDockerVolume(volBuilder.build)
         ).build
     }
   } // Builders
