@@ -59,6 +59,8 @@ private[impl] case object DVDIProvider extends ExternalVolumeProvider {
 
     def applyOptions(dv: MesosVolume.Source.DockerVolume.Builder, opts: Seq[Parameter]): Unit = {
       if (opts.isEmpty) {
+        // explicitly clear the options field if there are none to add; a nil parameters field is
+        // semantically different than an empty one.
         dv.clearDriverOptions
       }
       else {
