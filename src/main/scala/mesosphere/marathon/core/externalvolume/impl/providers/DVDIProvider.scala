@@ -26,8 +26,8 @@ private[impl] case object DVDIProvider extends ExternalVolumeProvider {
 
   object Builders {
     /**
-     * see [[mesosphere.marathon.api.serialization.ContainerSerializer]].
-     */
+      * see [[mesosphere.marathon.api.serialization.ContainerSerializer]].
+      */
     def toDockerizedMesosVolume(volume: ExternalVolume): MesosVolume =
       MesosVolume.newBuilder
         .setContainerPath(volume.containerPath)
